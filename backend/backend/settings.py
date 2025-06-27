@@ -193,6 +193,9 @@ CLOUDINARY_STORAGE = {
 
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
+AUTH_USER_MODEL = 'auth_app.CustomUser'
+
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'auth_app.authentication.JWTCookieAuthentication',
