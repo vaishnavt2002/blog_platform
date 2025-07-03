@@ -6,6 +6,9 @@ const PostList = () => {
   const [posts, setPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const truncateContent = (content, maxLength = 150) => {
     if (!content) return '';
@@ -17,16 +20,29 @@ const PostList = () => {
     const fetchPosts = async () => {
       setIsLoading(true);
       try {
-        const response = await blogApi.getPosts();
-        setPosts(response.data);
+        const response = await blogApi.getPosts({ search: searchQuery, page});
+        setPosts(response.data.results);
+        setTotalPages(Math.ceil(response.data.count / 10));
       } catch (err) {
-        setError("Failed to fetch posts");
+        setError('Failed to fetch posts');
       } finally {
         setIsLoading(false);
       }
     };
     fetchPosts();
-  }, []);
+  }, [searchQuery, page]);
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+    setPage(1);
+  };
+
+  const handlePrevPage = () => {
+    if (page > 1) setPage(page - 1);
+  };
+
+  const handleNextPage = () => {
+    if (page < totalPages) setPage(page + 1);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 py-12 px-6">
@@ -38,7 +54,15 @@ const PostList = () => {
             <p className="text-red-700 text-sm">{error}</p>
           </div>
         )}
-        
+        <div className="mb-8">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={handleSearchChange}
+            placeholder="Search by title, content, or author email..."
+            className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-transparent"
+          />
+        </div>
         {isLoading ? (
           <div className="text-center py-12">
             <div className="animate-spin h-8 w-8 border-4 border-slate-800 border-t-transparent rounded-full mx-auto"></div>
@@ -85,6 +109,13 @@ const PostList = () => {
             ))}
           </div>
         )}
+      </div>
+      <div className="mt-8 flex justify-center">
+        <button onClick={handlePrevPage} disabled={page===1}
+        className="px-4 py-2 bg-slate-800 text-white rounded-lg disabled:opacity-50">Previous</button>
+        <span className="text-slate-600">Page {page} of {totalPages}</span>
+        <button onClick={handleNextPage} disabled={page === totalPages}
+        className="px-4 py-2 bg-slate-800 text-white rounded-lg disabled:opacity-50">Next</button>
       </div>
     </div>
   );
