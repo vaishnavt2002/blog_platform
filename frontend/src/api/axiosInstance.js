@@ -50,36 +50,28 @@ axiosInstance.interceptors.response.use(
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
-        }).then(() => {
-          return axiosInstance(originalRequest);
-        }).catch(err => {
-          return Promise.reject(err);
-        });
+        })
+          .then(() => axiosInstance(originalRequest))
+          .catch((err) => Promise.reject(err));
       }
 
       originalRequest._retry = true;
       isRefreshing = true;
 
       try {
-        await refreshInstance.post('auth/token/refresh/');
+        const response = await refreshInstance.post('/auth/token/refresh/');
         processQueue(null);
         return axiosInstance(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        a
-
         console.error('Token refresh failed:', refreshError);
-        
- 
-        
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
       }
     }
-    
+
     return Promise.reject(error);
   }
 );
-
 export default axiosInstance;

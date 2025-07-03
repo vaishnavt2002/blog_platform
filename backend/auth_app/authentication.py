@@ -1,21 +1,18 @@
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
-from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.exceptions import InvalidToken, AuthenticationFailed
 
-User = get_user_model()
-
-class JWTCookieAuthentication(JWTAuthentication):
-
+class CookieJWTAuthentication(JWTAuthentication):
     def authenticate(self, request):
-        header_auth = super().authenticate(request)
-        if header_auth:
-            return header_auth
         access_token = request.COOKIES.get('access_token')
+
         if not access_token:
             return None
+
         try:
             validated_token = self.get_validated_token(access_token)
             user = self.get_user(validated_token)
-            return (user, validated_token)
-        except TokenError:
-            return None
+            return user, validated_token
+        except InvalidToken as e:
+            raise AuthenticationFailed('Invalid or expired token')
+        except Exception as e:
+            raise AuthenticationFailed('Authentication failed')

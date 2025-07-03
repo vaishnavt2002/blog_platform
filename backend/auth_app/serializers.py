@@ -27,7 +27,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     is_verified = serializers.BooleanField(default=False)
     class Meta:
         model = CustomUser
-        fields = ['email', 'username', 'is_verified']
+        fields = ['email', 'username', 'is_verified','is_staff']
 
 class OtpVerifySerializer(serializers.Serializer):
     email = serializers.EmailField()

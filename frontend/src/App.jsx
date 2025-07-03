@@ -8,6 +8,10 @@ import Signup from './components/Signup';
 import Loading from './components/Loading';
 
 import ForgotPassword from './components/ForgotPassword';
+import PostList from './components/PostList';
+import MyPosts from './components/MyPosts';
+import PostDetail from './components/PostDetail';
+import AdminDashboard from './components/AdminDashboard';
 
 const ProtectedRoute = ({ children }) => {
   const { user, isLoading } = useAuth();
@@ -45,7 +49,7 @@ function App() {
   }
 
   return (
-      <AuthProvider>
+      <>
         <Navbar />
         <Routes>
           <Route path="/" element={<LandingPage />} />
@@ -74,9 +78,42 @@ function App() {
               </PublicRoute>
             } 
           />
+          <Route 
+            path='/posts'
+            element={
+              <ProtectedRoute>
+                <PostList/>
+              </ProtectedRoute>
+            }
+          />
+          <Route 
+            path='/my-posts'
+            element={
+              <ProtectedRoute>
+                <MyPosts/>
+              </ProtectedRoute>
+            }
+          />
+          <Route 
+            path='/posts/:id'
+            element={
+              <ProtectedRoute>
+                <PostDetail/>
+              </ProtectedRoute>
+            }
+          />
+          <Route 
+            path='/admin'
+            element={
+              <ProtectedRoute>
+                <AdminDashboard/>
+              </ProtectedRoute>
+            }
+          />
         </Routes>
-      </AuthProvider>
+        </>
   );
 }
 
 export default App;
+

@@ -25,7 +25,7 @@ class RegisterView(APIView):
             existing_user = CustomUser.objects.get(email=email)
             if existing_user.is_verified:
                 return Response({
-                    'message': 'User with this email is already registered and verified'
+                    'error': 'User with this email is already registered and verified'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             else:
@@ -250,86 +250,100 @@ class LoginView(APIView):
         if serializer.is_valid():
             user = serializer.validated_data
             refresh = RefreshToken.for_user(user)
-            
-            response = Response({
-                'user': UserProfileSerializer(user).data,
-                'message': 'Login successful'
-            }, status=status.HTTP_200_OK)
-            
-            response.set_cookie(
-                key='access_token',
-                value=str(refresh.access_token),
-                max_age=settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds(),
-                httponly=True,
-                secure=settings.DEBUG is False,
-                samesite='Lax'
-            )
-            response.set_cookie(
-                key='refresh_token',
-                value=str(refresh),
-                max_age=settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds(),
-                httponly=True,
-                secure=settings.DEBUG is False,
-                samesite='Lax'
-            )
-            logger.info(f"Login successful for user: {user.email}")
-            return response
-        logger.error(f"Login failed: {serializer.errors}")
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-class CustomTokenRefreshView(TokenRefreshView):
-    def post(self, request, *args, **kwargs):
-        refresh_token = request.COOKIES.get('refresh_token')
-        
-        if not refresh_token:
-            logger.warning("Refresh token not found in cookies")
-            return Response({
-                'detail': 'Refresh token not found in cookies'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            refresh = RefreshToken(refresh_token)
             access_token = str(refresh.access_token)
+            refresh_token = str(refresh)
             
             response = Response({
-                'message': 'Token refreshed successfully'
-            }, status=status.HTTP_200_OK)
+                'access': access_token,
+                'refresh': refresh_token,
+                'user': UserProfileSerializer(user).data
+            })
             
+         
             response.set_cookie(
                 key='access_token',
                 value=access_token,
-                max_age=settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds(),
                 httponly=True,
-                secure=settings.DEBUG is False,
-                samesite='Lax'
+                secure = False,
+                samesite='Lax',
+                max_age=5 * 60,
+                domain='127.0.0.1'  
             )
             
+            response.set_cookie(
+                key='refresh_token',
+                value=refresh_token,
+                httponly=True,
+                secure = False,
+                samesite='Lax',
+                max_age=5 * 60,
+                domain='127.0.0.1'  
+            )
+                
+            logger.debug(f"Set cookies for user {user.email}: access_token={access_token[:10]}..., refresh_token={refresh_token[:10]}...")
+            return response
+        
+        logger.error(f"Login failed: {serializer.errors}")
+        return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
+
+class CustomTokenRefreshView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        refresh_token = request.COOKIES.get('refresh_token')
+
+        if not refresh_token:
+            logger.warning("Refresh token not found in cookies")
+            return Response({
+                'error': 'Refresh token not found in cookies'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+        try:
+            refresh = RefreshToken(refresh_token)
+            refresh.verify()
+            access_token = str(refresh.access_token)
+
+            response = Response({
+                'access': access_token,
+                'message': 'Token refreshed successfully'
+            }, status=status.HTTP_200_OK)
+
+            response.set_cookie(
+                key='access_token',
+                value=access_token,
+                httponly=True,
+                secure = False,
+                samesite='Lax',
+                max_age=5 * 60,
+                domain='127.0.0.1'  
+            )
+
             if settings.SIMPLE_JWT.get('ROTATE_REFRESH_TOKENS'):
                 refresh.set_jti()
                 refresh.set_exp()
                 new_refresh_token = str(refresh)
-                
                 response.set_cookie(
                     key='refresh_token',
                     value=new_refresh_token,
-                    max_age=settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds(),
                     httponly=True,
-                    secure=settings.DEBUG is False,
-                    samesite='Lax'
+                    secure = False,
+                    samesite='Lax',
+                    max_age=5 * 60,
+                    domain='127.0.0.1'
                 )
-            
+
             logger.info("Token refreshed successfully")
             return response
-            
+
         except TokenError as e:
             logger.error(f"Token refresh failed: {str(e)}")
             return Response({
-                'detail': f'Token is invalid or expired: {str(e)}'
+                'error': f'Token is invalid or expired: {str(e)}'
             }, status=status.HTTP_401_UNAUTHORIZED)
         except Exception as e:
             logger.error(f"Unexpected error during token refresh: {str(e)}")
             return Response({
-                'detail': 'Token refresh failed'
+                'error': 'Token refresh failed'
             }, status=status.HTTP_400_BAD_REQUEST)
 
 class LogoutView(APIView):
@@ -350,6 +364,7 @@ class LogoutView(APIView):
             'message': 'Logout successful'
         }, status=status.HTTP_200_OK)
         
+        # Clear cookies
         response.delete_cookie('access_token')
         response.delete_cookie('refresh_token')
         
