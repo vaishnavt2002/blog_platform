@@ -11,6 +11,7 @@ const MyPosts = () => {
   const [editPostId, setEditPostId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [validationErrors, setValidationErrors] = useState({});
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -43,12 +44,56 @@ const MyPosts = () => {
     fetchPosts(page);
   }, [user, navigate, page]);
 
-  const handleChange = (e) => {
-    if (e.target.type === 'file') {
-      setFormData({ ...formData, [e.target.name]: e.target.files[0] });
-    } else {
-      setFormData({ ...formData, [e.target.name]: e.target.value });
+  const validateForm = (data) => {
+    const errors = {};
+    const titleRegex = /^[a-zA-Z0-9]/;
+    
+    if (!data.title) {
+      errors.title = 'Title is required';
+    } else if (data.title.length < 5) {
+      errors.title = 'Title must be at least 5 characters long';
+    } else if (!titleRegex.test(data.title)) {
+      errors.title = 'Title must start with a letter or number';
     }
+
+    if (!data.content) {
+      errors.content = 'Content is required';
+    } else if (data.content.length < 5) {
+      errors.content = 'Content must be at least 5 characters long';
+    } else if (!titleRegex.test(data.content)) {
+      errors.content = 'Content must start with a letter or number';
+    }
+
+    if (data.image) {
+      const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+      if (!validImageTypes.includes(data.image.type)) {
+        errors.image = 'Image must be in JPG, JPEG, PNG, or GIF format';
+      }
+      if (data.image.size > 5 * 1024 * 1024) {
+        errors.image = 'Image file size must be less than 5MB';
+      }
+    }
+
+    if (data.file) {
+      if (data.file.type !== 'application/pdf') {
+        errors.file = 'File must be in PDF format';
+      }
+      if (data.file.size > 10 * 1024 * 1024) {
+        errors.file = 'PDF file size must be less than 10MB';
+      }
+    }
+
+    return errors;
+  };
+
+  const handleChange = (e) => {
+    const { name, value, files } = e.target;
+    if (e.target.type === 'file') {
+      setFormData({ ...formData, [name]: files[0] });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
+    setValidationErrors(prev => ({ ...prev, [name]: '' }));
   };
 
   const handleSubmit = async (e) => {
@@ -57,6 +102,12 @@ const MyPosts = () => {
       navigate('/login');
       return;
     }
+    const errors = validateForm(formData);
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const data = new FormData();
@@ -73,12 +124,12 @@ const MyPosts = () => {
       }
 
       setFormData({ title: '', content: '', image: null, file: null });
+      setValidationErrors({});
       const fileInputs = document.querySelectorAll('input[type="file"]');
       fileInputs.forEach(input => input.value = '');
 
-      // Refresh posts after create/update
       await fetchPosts(page);
-      setError(''); // Clear any previous errors
+      setError('');
     } catch (err) {
       setError(editPostId ? 'Failed to update post' : 'Failed to create post');
     } finally {
@@ -89,6 +140,7 @@ const MyPosts = () => {
   const handleCancelEdit = () => {
     setEditPostId(null);
     setFormData({ title: '', content: '', image: null, file: null });
+    setValidationErrors({});
     const fileInputs = document.querySelectorAll('input[type="file"]');
     fileInputs.forEach(input => input.value = '');
   };
@@ -128,9 +180,13 @@ const MyPosts = () => {
               name="title"
               value={formData.title}
               onChange={handleChange}
-              className="mt-1 block w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-transparent"
-              required
+              className={`mt-1 block w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-transparent ${
+                validationErrors.title ? 'border-red-400' : 'border-slate-200'
+              }`}
             />
+            {validationErrors.title && (
+              <p className="mt-1 text-sm text-red-600">{validationErrors.title}</p>
+            )}
           </div>
           <div className="mb-4">
             <label className="block text-sm font-medium text-slate-600">Content</label>
@@ -138,10 +194,14 @@ const MyPosts = () => {
               name="content"
               value={formData.content}
               onChange={handleChange}
-              className="mt-1 block w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-transparent"
+              className={`mt-1 block w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-transparent ${
+                validationErrors.content ? 'border-red-400' : 'border-slate-200'
+              }`}
               rows="6"
-              required
             ></textarea>
+            {validationErrors.content && (
+              <p className="mt-1 text-sm text-red-600">{validationErrors.content}</p>
+            )}
           </div>
           <div className="mb-4">
             <label className="block text-sm font-medium text-slate-600">Image</label>
@@ -149,9 +209,14 @@ const MyPosts = () => {
               type="file"
               name="image"
               onChange={handleChange}
-              className="mt-1 block w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-transparent"
-              accept="image/*"
+              className={`mt-1 block w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-transparent ${
+                validationErrors.image ? 'border-red-400' : 'border-slate-200'
+              }`}
+              accept="image/jpeg,image/jpg,image/png,image/gif"
             />
+            {validationErrors.image && (
+              <p className="mt-1 text-sm text-red-600">{validationErrors.image}</p>
+            )}
           </div>
           <div className="mb-4">
             <label className="block text-sm font-medium text-slate-600">File</label>
@@ -159,8 +224,14 @@ const MyPosts = () => {
               type="file"
               name="file"
               onChange={handleChange}
-              className="mt-1 block w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-transparent"
+              className={`mt-1 block w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-transparent ${
+                validationErrors.file ? 'border-red-400' : 'border-slate-200'
+              }`}
+              accept="application/pdf"
             />
+            {validationErrors.file && (
+              <p className="mt-1 text-sm text-red-600">{validationErrors.file}</p>
+            )}
           </div>
           <div className="flex space-x-4">
             <button
@@ -222,7 +293,6 @@ const MyPosts = () => {
                         </a>
                       </div>
                     )}
-                    {/* Removed Edit and Delete buttons from here */}
                     <div className="flex space-x-4">
                       <Link
                         to={`/posts/${post.id}`}

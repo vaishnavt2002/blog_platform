@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from .models import Post, Comment
 from django.contrib.auth import get_user_model
+import os
+import re
 
 User = get_user_model()
 
@@ -27,6 +29,53 @@ class PostSerializer(serializers.ModelSerializer):
             'image_url', 'file_url', 'read_count', 'likes_count', 
             'is_liked', 'created_at', 'updated_at'
         ]
+    
+    def validate_title(self, value):
+        if not value:
+            raise serializers.ValidationError("Title cannot be empty")
+        if len(value) < 5:
+            raise serializers.ValidationError("Title must be at least 5 characters long")
+        if not re.match(r'^[a-zA-Z0-9]', value):
+            raise serializers.ValidationError("Title must start with a letter or number")
+        return value
+    
+    def validate_content(self, value):
+        if not value:
+            raise serializers.ValidationError("Content cannot be empty")
+        if len(value) < 5:
+            raise serializers.ValidationError("Content must be at least 5 characters long")
+        if not re.match(r'^[a-zA-Z0-9]', value):
+            raise serializers.ValidationError("Content must start with a letter or number")
+        return value
+    
+    def validate_image(self, value):
+        if value:
+            valid_extensions = ['.jpg', '.jpeg', '.png', '.gif']
+            ext = os.path.splitext(value.name)[1].lower()
+            if ext not in valid_extensions:
+                raise serializers.ValidationError(
+                    "Invalid image format. Only JPG, JPEG, PNG, and GIF are allowed."
+                )
+            max_size = 5 * 1024 * 1024  # 5MB
+            if value.size > max_size:
+                raise serializers.ValidationError(
+                    "Image file size must be less than 5MB"
+                )
+        return value
+    
+    def validate_file(self, value):
+        if value:
+            ext = os.path.splitext(value.name)[1].lower()
+            if ext != '.pdf':
+                raise serializers.ValidationError(
+                    "File must be in PDF format"
+                )
+            max_size = 10 * 1024 * 1024  # 10MB
+            if value.size > max_size:
+                raise serializers.ValidationError(
+                    "PDF file size must be less than 10MB"
+                )
+        return value
     
     def get_likes_count(self, obj):
         return obj.likes.count()
@@ -83,3 +132,12 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ['id', 'post', 'user', 'content', 'is_approved', 'created_at']
+    
+    def validate_content(self, value):
+        if not value:
+            raise serializers.ValidationError("Comment content cannot be empty")
+        if not re.match(r'^[a-zA-Z0-9]', value):
+            raise serializers.ValidationError(
+                "Comment must start with a letter or number"
+            )
+        return value

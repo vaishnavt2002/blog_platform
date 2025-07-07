@@ -135,7 +135,7 @@ const Signup = () => {
             {step === 1 ? 'Sign Up' : 'Verify OTP'}
           </h1>
           <p className="text-slate-500 mt-2">
-            {step === 1 ? 'Create your account to start managing books' : 'Enter the OTP sent to your email'}
+            {step === 1 ? 'Create your account to start' : 'Enter the OTP sent to your email'}
           </p>
         </div>
         {successMessage && (
