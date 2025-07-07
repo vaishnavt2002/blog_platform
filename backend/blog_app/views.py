@@ -92,12 +92,20 @@ class CommentViewSet(viewsets.ModelViewSet):
         if post.author == self.request.user:
             raise serializers.ValidationError("You cannot comment on your own post")
         serializer.save(user=self.request.user, is_approved=False)
+    
+    def perform_update(self, serializer):
+        # Added permission check to ensure only the comment's author can edit
+        comment = self.get_object()
+        if self.request.user != comment.user:
+            raise PermissionDenied("You are not allowed to edit this comment.")
+        # Reset is_approved to False on update to require re-approval
+        serializer.save(is_approved=False)
+    
     def destroy(self, request, *args, **kwargs):
         comment = self.get_object()
         if request.user != comment.user:
             raise PermissionDenied("You are not allowed to delete this comment.")
         return super().destroy(request, *args, **kwargs)
-
 
 class AdminCommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.filter(is_approved=False)

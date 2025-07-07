@@ -12,6 +12,7 @@ import PostList from './components/PostList';
 import MyPosts from './components/MyPosts';
 import PostDetail from './components/PostDetail';
 import AdminDashboard from './components/AdminDashboard';
+import Profile from './components/Profile';
 
 const ProtectedRoute = ({ children }) => {
   const { user, isLoading } = useAuth();
@@ -83,6 +84,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <PostList/>
+              </ProtectedRoute>
+            }
+          />
+          <Route 
+            path='/profile'
+            element={
+              <ProtectedRoute>
+                <Profile/>
               </ProtectedRoute>
             }
           />

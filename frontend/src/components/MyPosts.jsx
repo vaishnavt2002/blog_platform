@@ -86,27 +86,6 @@ const MyPosts = () => {
     }
   };
 
-  const handleEdit = (post) => {
-    setEditPostId(post.id);
-    setFormData({
-      title: post.title,
-      content: post.content,
-      image: null,
-      file: null,
-    });
-  };
-
-  const handleDelete = async (id) => {
-    try {
-      await blogApi.deletePost(id);
-      // Refresh posts after delete
-      await fetchPosts(page);
-      setError(''); // Clear any previous errors
-    } catch (err) {
-      setError('Failed to delete post');
-    }
-  };
-
   const handleCancelEdit = () => {
     setEditPostId(null);
     setFormData({ title: '', content: '', image: null, file: null });
@@ -243,6 +222,7 @@ const MyPosts = () => {
                         </a>
                       </div>
                     )}
+                    {/* Removed Edit and Delete buttons from here */}
                     <div className="flex space-x-4">
                       <Link
                         to={`/posts/${post.id}`}
@@ -250,18 +230,6 @@ const MyPosts = () => {
                       >
                         View
                       </Link>
-                      <button
-                        onClick={() => handleEdit(post)}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(post.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        Delete
-                      </button>
                     </div>
                   </article>
                 ))
