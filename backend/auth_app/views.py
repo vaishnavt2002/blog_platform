@@ -259,32 +259,32 @@ class LoginView(APIView):
                 'user': UserProfileSerializer(user).data
             })
             
-         
+            # Set access token cookie (5 minutes)
             response.set_cookie(
                 key='access_token',
                 value=access_token,
                 httponly=True,
-                secure = False,
+                secure=False,  # False for development
                 samesite='Lax',
-                max_age=5 * 60,
-                domain='127.0.0.1'  
+                max_age=5 * 60,  # 5 minutes
             )
             
+            # Set refresh token cookie (1 day)
             response.set_cookie(
                 key='refresh_token',
                 value=refresh_token,
                 httponly=True,
-                secure = False,
+                secure=False,  # False for development
                 samesite='Lax',
-                max_age=5 * 60,
-                domain='127.0.0.1'  
+                max_age=24 * 60 * 60,  # 24 hours (1 day)
             )
                 
-            logger.debug(f"Set cookies for user {user.email}: access_token={access_token[:10]}..., refresh_token={refresh_token[:10]}...")
+            logger.debug(f"Login successful for user {user.email}")
             return response
         
         logger.error(f"Login failed: {serializer.errors}")
         return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
+
 
 class CustomTokenRefreshView(APIView):
     permission_classes = [AllowAny]
@@ -300,7 +300,6 @@ class CustomTokenRefreshView(APIView):
 
         try:
             refresh = RefreshToken(refresh_token)
-            refresh.verify()
             access_token = str(refresh.access_token)
 
             response = Response({
@@ -308,29 +307,15 @@ class CustomTokenRefreshView(APIView):
                 'message': 'Token refreshed successfully'
             }, status=status.HTTP_200_OK)
 
+            # Set new access token cookie (5 minutes)
             response.set_cookie(
                 key='access_token',
                 value=access_token,
                 httponly=True,
-                secure = False,
+                secure=False,  # False for development
                 samesite='Lax',
-                max_age=5 * 60,
-                domain='127.0.0.1'  
+                max_age=5 * 60,  # 5 minutes
             )
-
-            if settings.SIMPLE_JWT.get('ROTATE_REFRESH_TOKENS'):
-                refresh.set_jti()
-                refresh.set_exp()
-                new_refresh_token = str(refresh)
-                response.set_cookie(
-                    key='refresh_token',
-                    value=new_refresh_token,
-                    httponly=True,
-                    secure = False,
-                    samesite='Lax',
-                    max_age=5 * 60,
-                    domain='127.0.0.1'
-                )
 
             logger.info("Token refreshed successfully")
             return response
@@ -338,13 +323,14 @@ class CustomTokenRefreshView(APIView):
         except TokenError as e:
             logger.error(f"Token refresh failed: {str(e)}")
             return Response({
-                'error': f'Token is invalid or expired: {str(e)}'
+                'error': 'Token is invalid or expired'
             }, status=status.HTTP_401_UNAUTHORIZED)
         except Exception as e:
             logger.error(f"Unexpected error during token refresh: {str(e)}")
             return Response({
                 'error': 'Token refresh failed'
             }, status=status.HTTP_400_BAD_REQUEST)
+
 
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]

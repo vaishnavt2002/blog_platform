@@ -1,3 +1,4 @@
+from urllib import request
 from rest_framework import viewsets, permissions, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -7,6 +8,9 @@ from .serializers import *
 from django.contrib.auth import get_user_model
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly, IsAdminUser
 from rest_framework.pagination import PageNumberPagination
+from django.db.models import Q
+from django.shortcuts import get_object_or_404
+from rest_framework.exceptions import PermissionDenied
 
 User = get_user_model()
 
@@ -28,6 +32,14 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         return serializer.save(author=self.request.user)
+    
+    def get_queryset(self):
+        queryset = Post.objects.all()
+        if self.action == 'list':
+            if self.request.user.is_authenticated:
+                queryset = queryset.filter(~Q(author=self.request.user))
+        
+        return queryset
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def my_posts(self, request):
@@ -66,25 +78,49 @@ class CommentViewSet(viewsets.ModelViewSet):
         queryset = Comment.objects.all()
         post_id = self.request.query_params.get('post')
         if post_id is not None:
-            queryset = queryset.filter(post__id=post_id)
+            if self.request.user.is_authenticated:
+                queryset = queryset.filter(
+                    Q(post__id=post_id) & (Q(is_approved=True) | Q(user=self.request.user))
+                ).order_by('-created_at')
+            else:
+                queryset = queryset.filter(post__id=post_id, is_approved=True).order_by('-created_at')
         return queryset
     
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-    
+        post_id = self.request.data.get('post')
+        post = Post.objects.get(id=post_id)
+        if post.author == self.request.user:
+            raise serializers.ValidationError("You cannot comment on your own post")
+        serializer.save(user=self.request.user, is_approved=False)
+    def destroy(self, request, *args, **kwargs):
+        comment = self.get_object()
+        if request.user != comment.user:
+            raise PermissionDenied("You are not allowed to delete this comment.")
+        return super().destroy(request, *args, **kwargs)
+
+
+class AdminCommentViewSet(viewsets.ModelViewSet):
+    queryset = Comment.objects.filter(is_approved=False)
+    serializer_class = CommentSerializer
+    permission_classes = [IsAdminUser]
+
+    def destroy(self, request, *args, **kwargs):
+        comment = self.get_object()
+        return super().destroy(request, *args, **kwargs)
+
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def approve(self, request, pk):
         comment = self.get_object()
         comment.is_approved = True
         comment.save()
-        return Response({"message": 'comment approved'}, status=status.HTTP_200_OK)
-    
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+        return Response({"message": "Comment approved"}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def block(self, request, pk):
         comment = self.get_object()
         comment.is_approved = False
         comment.save()
-        return Response({"message": "comment is blocked"}, status=status.HTTP_200_OK)
+        return Response({"message": "Comment blocked"}, status=status.HTTP_200_OK)
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()

@@ -29,7 +29,7 @@ const MyPosts = () => {
       }
     } catch (err) {
       setError('Failed to fetch posts');
-      setPosts([]); // Ensure posts is always an array
+      setPosts([]); 
     } finally {
       setIsLoading(false);
     }

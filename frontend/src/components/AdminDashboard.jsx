@@ -13,6 +13,8 @@ const AdminDashboard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('comments');
+  // CHANGED: Added state for modal
+  const [modal, setModal] = useState({ isOpen: false, action: null, commentId: null });
 
   useEffect(() => {
     if (!user || !user.is_staff) {
@@ -23,7 +25,8 @@ const AdminDashboard = () => {
       setIsLoading(true);
       try {
         if (activeTab === 'comments') {
-          const response = await blogApi.getComments();
+          // CHANGED: Fetch pending comments from admin/comments endpoint
+          const response = await blogApi.getPendingComments();
           setComments(response.data);
         } else if (activeTab === 'users') {
           const response = await blogApi.getUsers();
@@ -38,67 +41,45 @@ const AdminDashboard = () => {
     fetchData();
   }, [user, navigate, activeTab]);
 
-  const handleUserChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setUserFormData({ ...userFormData, [name]: type === 'checkbox' ? checked : value });
-  };
-
-  const handleUserSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      if (editUserId) {
-        await blogApi.updateUser(editUserId, userFormData);
-        setEditUserId(null);
-      } else {
-        await blogApi.createUser(userFormData);
-      }
-      setUserFormData({ email: '', first_name: '', last_name: '', is_staff: false });
-      const response = await blogApi.getUsers();
-      setUsers(response.data);
-    } catch (err) {
-      setError(editUserId ? 'Failed to update user' : 'Failed to create user');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleEditUser = (user) => {
-    setEditUserId(user.id);
-    setUserFormData({
-      email: user.email,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      is_staff: user.is_staff,
-    });
-  };
-
-  const handleDeleteUser = async (id) => {
-    try {
-      await blogApi.deleteUser(id);
-      setUsers(users.filter((user) => user.id !== id));
-    } catch (err) {
-      setError('Failed to delete user');
-    }
-  };
-
   const handleApproveComment = async (id) => {
     try {
       await blogApi.approveComment(id);
-      const response = await blogApi.getComments();
+      const response = await blogApi.getPendingComments();
       setComments(response.data);
     } catch (err) {
       setError('Failed to approve comment');
     }
   };
 
-  const handleBlockComment = async (id) => {
+  const handleDeleteComment = async (id) => {
     try {
-      await blogApi.blockComment(id);
-      const response = await blogApi.getComments();
+      await blogApi.deleteComment(id);
+      const response = await blogApi.getPendingComments();
       setComments(response.data);
     } catch (err) {
-      setError('Failed to block comment');
+      setError('Failed to delete comment');
+    }
+  };
+
+  // CHANGED: Added modal confirmation handler
+  const openModal = (action, commentId) => {
+    setModal({ isOpen: true, action, commentId });
+  };
+
+  const closeModal = () => {
+    setModal({ isOpen: false, action: null, commentId: null });
+  };
+
+  const confirmAction = async () => {
+    try {
+      if (modal.action === 'approve') {
+        await handleApproveComment(modal.commentId);
+      } else if (modal.action === 'delete') {
+        await handleDeleteComment(modal.commentId);
+      }
+      closeModal();
+    } catch (err) {
+      setError(`Failed to ${modal.action} comment`);
     }
   };
 
@@ -135,133 +116,90 @@ const AdminDashboard = () => {
             onClick={() => setActiveTab('users')}
             className={`px-4 py-2 rounded-lg ${activeTab === 'users' ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-800'}`}
           >
-            Manage Users
+            Users
           </button>
         </div>
 
         {activeTab === 'comments' && (
           <>
-            <h2 className="text-2xl font-light text-slate-800 mb-4">Manage Comments</h2>
+            <h2 className="text-2xl font-light text-slate-800 mb-4">Pending Comments</h2>
             <div className="grid gap-6">
-              {comments.map((comment) => (
-                <div key={comment.id} className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-                  <p className="text-slate-700">{comment.content}</p>
-                  <p className="text-slate-500 text-sm">
-                    By {comment.user.email} on Post {comment.post} | Status: {comment.is_approved ? 'Approved' : 'Pending/Blocked'}
-                  </p>
-                  <div className="mt-4 flex space-x-4">
-                    <button
-                      onClick={() => handleApproveComment(comment.id)}
-                      className="text-green-600 hover:text-green-800"
-                      disabled={comment.is_approved}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      onClick={() => handleBlockComment(comment.id)}
-                      className="text-red-600 hover:text-red-800"
-                      disabled={!comment.is_approved}
-                    >
-                      Block
-                    </button>
+              {comments.length > 0 ? (
+                comments.map((comment) => (
+                  <div key={comment.id} className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+                    <p className="text-slate-700">{comment.content}</p>
+                    <p className="text-slate-500 text-sm">
+                      By {comment.user.email} on Post {comment.post} | Status: Pending
+                    </p>
+                    <div className="mt-4 flex space-x-4">
+                      <button
+                        onClick={() => openModal('approve', comment.id)}
+                        className="text-green-600 hover:text-green-800"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => openModal('delete', comment.id)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-slate-600">No pending comments.</p>
+              )}
             </div>
           </>
         )}
 
         {activeTab === 'users' && (
           <>
-            <h2 className="text-2xl font-light text-slate-800 mb-4">Manage Users</h2>
-            <form onSubmit={handleUserSubmit} className="mb-12 bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-600">Email</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={userFormData.email}
-                  onChange={handleUserChange}
-                  className="mt-1 block w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-transparent"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-600">First Name</label>
-                <input
-                  type="text"
-                  name="first_name"
-                  value={userFormData.first_name}
-                  onChange={handleUserChange}
-                  className="mt-1 block w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-transparent"
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-600">Last Name</label>
-                <input
-                  type="text"
-                  name="last_name"
-                  value={userFormData.last_name}
-                  onChange={handleUserChange}
-                  className="mt-1 block w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-400 focus:border-transparent"
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-600">
-                  <input
-                    type="checkbox"
-                    name="is_staff"
-                    checked={userFormData.is_staff}
-                    onChange={handleUserChange}
-                    className="mr-2"
-                  />
-                  Admin Status
-                </label>
-              </div>
-              <div className="flex space-x-4">
-                <button
-                  type="submit"
-                  className="px-6 py-3 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors duration-200 disabled:opacity-50"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (editUserId ? 'Updating...' : 'Creating...') : (editUserId ? 'Update User' : 'Create User')}
-                </button>
-                {editUserId && (
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    className="px-6 py-3 bg-slate-600 text-white rounded-lg hover:bg-slate-500 transition-colors duration-200"
-                  >
-                    Cancel
-                  </button>
-                )}
-              </div>
-            </form>
+            <h2 className="text-2xl font-light text-slate-800 mb-4">Users</h2>
             <div className="grid gap-6">
               {users.map((user) => (
                 <div key={user.id} className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
                   <p className="text-slate-700">{user.email}</p>
                   <p className="text-slate-500 text-sm">
-                    {user.first_name} {user.last_name} | {user.is_staff ? 'Admin' : 'User'}
+                    {user.username} {user.is_staff ? '(Admin)' : '(User)'}
                   </p>
-                  <div className="mt-4 flex space-x-4">
-                    <button
-                      onClick={() => handleEditUser(user)}
-                      className="text-blue-600 hover:text-blue-800"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteUser(user.id)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      Delete
-                    </button>
-                  </div>
                 </div>
               ))}
             </div>
           </>
+        )}
+
+        {/* CHANGED: Added confirmation modal */}
+        {modal.isOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full">
+              <h3 className="text-lg font-medium text-slate-800 mb-4">
+                Confirm {modal.action === 'approve' ? 'Approval' : 'Deletion'}
+              </h3>
+              <p className="text-slate-600 mb-6">
+                Are you sure you want to {modal.action} this comment?
+              </p>
+              <div className="flex justify-end space-x-4">
+                <button
+                  onClick={closeModal}
+                  className="px-4 py-2 bg-slate-200 text-slate-800 rounded-lg hover:bg-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmAction}
+                  className={`px-4 py-2 rounded-lg ${
+                    modal.action === 'approve'
+                      ? 'bg-green-600 text-white hover:bg-green-700'
+                      : 'bg-red-600 text-white hover:bg-red-700'
+                  }`}
+                >
+                  {modal.action === 'approve' ? 'Approve' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

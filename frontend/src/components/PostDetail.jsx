@@ -58,13 +58,13 @@ const PostDetail = () => {
       await blogApi.createComment({ post: id, content: commentContent });
       setCommentContent('');
       const commentsResponse = await blogApi.getComments(id);
-      setComments(commentsResponse.data.filter(comment => comment.is_approved));
+      setComments(commentsResponse.data);
     } catch (err) {
       setError('Failed to submit comment');
       console.error('Error submitting comment:', err);
     }
   };
-
+  const isOwnPost = user && post?.author?.email === user.email;
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -126,7 +126,7 @@ const PostDetail = () => {
           </button>
         )}
         <h2 className="text-2xl font-light text-slate-800 mb-4">Comments</h2>
-        {user ? (
+        {user && !isOwnPost ? (
           <form onSubmit={handleCommentSubmit} className="mb-6">
             <textarea
               value={commentContent}
@@ -143,6 +143,8 @@ const PostDetail = () => {
               Submit Comment
             </button>
           </form>
+        ) : isOwnPost ? (
+          <p className="text-slate-600 mb-6">You cannot comment on your own post.</p>
         ) : (
           <p className="text-slate-600 mb-6">
             <Link to="/login" className="text-slate-600 hover:text-slate-800 hover:underline">
@@ -156,6 +158,9 @@ const PostDetail = () => {
             <div key={comment.id} className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
               <p className="text-slate-700">{comment.content}</p>
               <p className="text-slate-500 text-sm">By {comment.user.email} | {new Date(comment.created_at).toLocaleDateString()}</p>
+              {user && comment.user.email === user.email && !comment.is_approved && (
+                  <span className="text-yellow-600 ml-2"> (Pending Approval)</span>
+                )}
             </div>
           ))}
         </div>

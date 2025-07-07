@@ -14,11 +14,9 @@ class PostSerializer(serializers.ModelSerializer):
     likes_count = serializers.SerializerMethodField()
     is_liked = serializers.SerializerMethodField()
     
-    # For reading - return URLs
     image_url = serializers.SerializerMethodField()
     file_url = serializers.SerializerMethodField()
     
-    # For writing - accept file uploads
     image = serializers.ImageField(write_only=True, required=False, allow_null=True)
     file = serializers.FileField(write_only=True, required=False, allow_null=True)
     
