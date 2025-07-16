@@ -15,7 +15,7 @@ const blogApi = {
   likePost: (id) => axiosInstance.post(`/blog/posts/${id}/like/`),
   getComments: (postId) => axiosInstance.get(postId ? `/blog/comments/?post=${postId}` : '/blog/comments/'),
   createComment: (data) => axiosInstance.post('/blog/comments/', data),
-  updateComment: (id, data) => axiosInstance.put(`/blog/comments/${id}/`, data),
+  updateComment: (id, data) => axiosInstance.put(`/blog/admin/comments/${id}/`, data),
   deleteComment: (id) => axiosInstance.delete(`/blog/comments/${id}/`),
   getPendingComments: () => axiosInstance.get('/blog/admin/comments/'),
   approveComment: (id) => axiosInstance.post(`/blog/admin/comments/${id}/approve/`),
